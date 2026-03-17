@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>버스 외부 광고 노선 기획안 — AdType</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --key:        #EB4200;
+    --key-light:  rgba(235,66,0,0.08);
+    --key-mid:    rgba(235,66,0,0.15);
+    --bg:         #FFFFFF;
+    --bg-alt:     #F6F5F2;
+    --bg-card:    #EFEEEB;
+    --text:       #1A1A1A;
+    --text-sub:   #555555;
+    --text-muted: #999999;
+    --border:     rgba(0,0,0,0.09);
+    /* 노선 컬러 */
+    --b1:  #EB4200;
+    --b2:  #1D63D8;
+    --b2a: #B87000;
+    --s1:  #0A7A4B;
+    --s2:  #6B35C4;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: sticky; top: 0; z-index: 1000;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 0 64px;
+    display: flex; align-items: center;
+    height: 54px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .nav-brand {
+    font-size: 12px; font-weight: 800;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--key); margin-right: 40px;
+  }
+  .nav-divider { width: 1px; height: 18px; background: var(--border); margin-right: 40px; }
+  .nav-tabs { display: flex; height: 100%; }
+  .nav-tab {
+    padding: 0 20px; height: 100%;
+    display: flex; align-items: center;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-muted); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s; user-select: none;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--key); border-bottom-color: var(--key); font-weight: 600; }
+
+  /* ── COVER ── */
+  .cover {
+    padding: 64px 64px 52px;
+    border-bottom: 2px solid var(--key);
+  }
+  .cover-eyebrow {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--key); margin-bottom: 14px;
+  }
+  .cover-title {
+    font-size: 44px; font-weight: 800;
+    line-height: 1.1; letter-spacing: -0.02em;
+    margin-bottom: 14px;
+  }
+  .cover-title em { color: var(--key); font-style: normal; }
+  .cover-desc {
+    font-size: 14px; color: var(--text-sub);
+    max-width: 540px; margin-bottom: 36px; line-height: 1.75;
+  }
+  .cover-meta {
+    display: flex; gap: 40px;
+    padding-top: 24px; border-top: 1px solid var(--border);
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 3px; }
+  .meta-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .meta-value { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  /* ── CITY SECTION ── */
+  .city-section { display: none; }
+  .city-section.active { display: block; }
+
+  /* ── CITY HEADER ── */
+  .city-header {
+    padding: 40px 64px 0;
+    display: flex; align-items: baseline; gap: 14px;
+  }
+  .city-tag {
+    background: var(--key); color: #fff;
+    font-size: 10px; font-weight: 800;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 2px;
+  }
+  .city-name { font-size: 20px; font-weight: 700; }
+  .city-sub { font-size: 13px; color: var(--text-muted); }
+
+  /* ── SUMMARY BAR ── */
+  .summary-bar {
+    margin: 20px 64px 0;
+    border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+    display: grid;
+  }
+  .summary-bar.cols-3 { grid-template-columns: repeat(3,1fr); }
+  .summary-bar.cols-2 { grid-template-columns: repeat(2,1fr); }
+  .summary-cell {
+    padding: 24px 28px;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    position: relative;
+  }
+  .summary-cell:last-child { border-right: none; }
+  .summary-cell::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+  }
+  .sc-b1::before  { background: var(--b1); }
+  .sc-b2::before  { background: var(--b2); }
+  .sc-b2a::before { background: var(--b2a); }
+  .sc-s1::before  { background: var(--s1); }
+  .sc-s2::before  { background: var(--s2); }
+  .line-tag {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+  .lt-b1  { color: var(--b1); }
+  .lt-b2  { color: var(--b2); }
+  .lt-b2a { color: var(--b2a); }
+  .lt-s1  { color: var(--s1); }
+  .lt-s2  { color: var(--s2); }
+  .summary-cell h3 { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+  .summary-cell .route-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5; }
+  .stats-row { display: flex; gap: 20px; }
+  .stat { display: flex; flex-direction: column; gap: 1px; }
+  .stat-val { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+  .sv-b1  { color: var(--b1); }
+  .sv-b2  { color: var(--b2); }
+  .sv-b2a { color: var(--b2a); }
+  .sv-s1  { color: var(--s1); }
+  .sv-s2  { color: var(--s2); }
+  .stat-lbl { font-size: 10px; color: var(--text-muted); }
+
+  /* ── ROUTE SECTION ── */
+  .route-section {
+    padding: 48px 64px 0;
+    margin-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  .section-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 28px; padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 2px;
+    color: #fff; margin-bottom: 9px;
+  }
+  .sb-b1  { background: var(--b1); }
+  .sb-b2  { background: var(--b2); }
+  .sb-b2a { background: var(--b2a); }
+  .sb-s1  { background: var(--s1); }
+  .sb-s2  { background: var(--s2); }
+  .section-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .section-subtitle { font-size: 12px; color: var(--text-muted); }
+  .section-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .big-stat { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+  .bs-b1  { color: var(--b1); }
+  .bs-b2  { color: var(--b2); }
+  .bs-b2a { color: var(--b2a); }
+  .bs-s1  { color: var(--s1); }
+  .bs-s2  { color: var(--s2); }
+  .big-lbl { font-size: 10px; color: var(--text-muted); letter-spacing: 0.08em; }
+
+  /* ── FLOW BAR ── */
+  .flow-bar {
+    display: flex; align-items: stretch;
+    height: 42px; border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+    margin-bottom: 36px;
+  }
+  .flow-label {
+    padding: 0 16px; background: var(--bg-card);
+    display: flex; align-items: center;
+    font-size: 11px; font-weight: 700;
+    white-space: nowrap; border-right: 1px solid var(--border);
+  }
+  .flow-fwd {
+    flex: 1; display: flex; align-items: center;
+    padding: 0 16px; font-size: 11px; font-weight: 600;
+    color: #fff;
+  }
+  .flow-rev {
+    flex: 1; display: flex; align-items: center;
+    justify-content: flex-end;
+    padding: 0 16px; font-size: 11px; font-weight: 600;
+    border-left: 1px solid rgba(255,255,255,0.25);
+  }
+  .flow-end {
+    padding: 0 16px; background: var(--bg-card);
+    display: flex; align-items: center;
+    font-size: 11px; font-weight: 700;
+    white-space: nowrap; border-left: 1px solid var(--border);
+  }
+
+  /* ── CONTENT GRID ── */
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 28px; margin-bottom: 36px;
+  }
+
+  /* ── MAP ── */
+  .map-wrap { position: relative; }
+  .map-container {
+    width: 100%; height: 400px;
+    border-radius: 4px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .map-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 9px; font-size: 11px; font-weight: 500;
+    text-decoration: none; color: var(--key);
+    opacity: 0.75; transition: opacity 0.15s;
+  }
+  .map-link:hover { opacity: 1; }
+
+  /* ── WAYPOINTS ── */
+  .waypoint-panel { display: flex; flex-direction: column; }
+  .panel-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-muted); padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .waypoint-item {
+    display: flex; gap: 11px; padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .waypoint-item:last-child { border-bottom: none; }
+  .wp-num {
+    font-size: 10px; font-weight: 600;
+    color: var(--text-muted); min-width: 16px; padding-top: 2px;
+  }
+  .wp-body { flex: 1; }
+  .wp-name { font-size: 12px; font-weight: 600; margin-bottom: 1px; }
+  .wp-detail { font-size: 11px; color: var(--text-sub); line-height: 1.4; }
+  .wp-tag {
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 2px;
+    margin-left: 5px; vertical-align: middle;
+  }
+  .wp-tag.start, .wp-tag.end,
+  .wp-tag.start2, .wp-tag.end2,
+  .wp-tag.start2a, .wp-tag.end2a {
+    background: var(--key-light); color: var(--key);
+  }
+  .wp-tag.key { background: var(--bg-card); color: var(--text-sub); }
+
+  /* ── INFO ROW ── */
+  .info-row {
+    display: grid;
+    grid-template-columns: repeat(2,1fr);
+    gap: 10px; margin-bottom: 28px;
+  }
+  .info-card {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px; padding: 18px 20px;
+  }
+  .info-card-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 7px;
+  }
+  .info-card-value { font-size: 13px; font-weight: 500; line-height: 1.6; color: var(--text); }
+  .info-card-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+
+  /* ── NOTICE ── */
+  .notice-block {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--key);
+    border-radius: 0 4px 4px 0;
+    padding: 14px 18px; margin-bottom: 48px;
+    font-size: 12px; color: var(--text-sub); line-height: 1.8;
+  }
+  .notice-block strong { color: var(--text); font-weight: 600; }
+
+  /* ── FOOTER ── */
+  .footer {
+    padding: 32px 64px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 2px solid var(--key);
+    background: var(--bg-alt); margin-top: 40px;
+  }
+  .footer-brand { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: var(--key); text-transform: uppercase; }
+  .footer-info { font-size: 11px; color: var(--text-muted); text-align: right; line-height: 1.7; }
+
+  @media (max-width: 900px) {
+    .nav, .cover, .city-header, .route-section { padding-left: 24px; padding-right: 24px; }
+    .summary-bar { margin-left: 24px; margin-right: 24px; grid-template-columns: 1fr !important; }
+    .summary-cell { border-right: none; border-bottom: 1px solid var(--border); }
+    .content-grid { grid-template-columns: 1fr; }
+    .info-row { grid-template-columns: 1fr; }
+    .cover-title { font-size: 30px; }
+    .footer { flex-direction: column; gap: 12px; text-align: center; }
+    .footer-info { text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="nav-brand">AdType</div>
+  <div class="nav-divider"></div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-city="busan" onclick="switchCity('busan')">부산 노선</div>
+    <div class="nav-tab" data-city="seoul" onclick="switchCity('seoul')">서울 노선</div>
+  </div>
+</nav>
+
+<!-- ── COVER ── -->
+<div class="cover">
+  <div class="cover-eyebrow">AdType · OOH Campaign Planning</div>
+  <h1 class="cover-title">버스 외부 광고<br><em>노선 기획 보고서</em></h1>
+  <p class="cover-desc">체류인구 히트맵 및 이동 동선 분석 기반 노선 설계. 부산 3개 노선 + 서울 2개 노선, 총 5개 노선 편도 기준 거리 및 경유지 상세 포함.</p>
+  <div class="cover-meta">
+    <div class="meta-item"><span class="meta-label">총 노선</span><span class="meta-value">5개 노선 (부산 3 · 서울 2)</span></div>
+    <div class="meta-item"><span class="meta-label">집행 형태</span><span class="meta-value">대절 버스 외부 래핑 광고</span></div>
+    <div class="meta-item"><span class="meta-label">도로 기준</span><span class="meta-value">왕복 4차선 이상</span></div>
+    <div class="meta-item"><span class="meta-label">데이터 기준</span><span class="meta-value">KT 빅데이터 체류인구 히트맵</span></div>
+    <div class="meta-item"><span class="meta-label">작성</span><span class="meta-value">AdType · Draftype Studio</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- 부산 SECTION -->
+<!-- ════════════════════════════════════════ -->
+<div class="city-section active" id="city-busan">
+
+  <div class="city-header">
+    <span class="city-tag">Busan</span>
+    <span class="city-name">부산광역시</span>
+    <span class="city-sub">3개 노선 · 편도 왕복 집중 노출 전략</span>
+  </div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar cols-3">
+    <div class="summary-cell sc-b1">
+      <div class="line-tag lt-b1">Line 01</div>
+      <h3>해운대 · 센텀 · 광안리</h3>
+      <p class="route-desc">해운대해수욕장 ↔ 민락동 카페거리<br>왕복 집중 노출 노선</p>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val sv-b1">~22km</span><span class="stat-lbl">편도 거리</span></div>
+        <div class="stat"><span class="stat-val sv-b1">9곳</span><span class="stat-lbl">핵심 경유지</span></div>
+      </div>
+    </div>
+    <div class="summary-cell sc-b2">
+      <div class="line-tag lt-b2">Line 02</div>
+      <h3>서면 · 초량 · 남포 · 송도</h3>
+      <p class="route-desc">서면 롯데백화점 ↔ 암남공원·케이블카<br>왕복 집중 노출 노선</p>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val sv-b2">~27km</span><span class="stat-lbl">편도 거리</span></div>
+        <div class="stat"><span class="stat-val sv-b2">10곳</span><span class="stat-lbl">핵심 경유지</span></div>
+      </div>
+    </div>
+    <div class="summary-cell sc-b2a">
+      <div class="line-tag lt-b2a">Line 02-A</div>
+      <h3>서면 · 아시아드 · 초량 · 남포</h3>
+      <p class="route-desc">서면 → 아시아드주경기장 → 서면 → 남포<br>6월 12~13일 이벤트 특화 노선</p>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val sv-b2a">~35km</span><span class="stat-lbl">편도 거리</span></div>
+        <div class="stat"><span class="stat-val sv-b2a">11곳</span><span class="stat-lbl">핵심 경유지</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 부산 1호선 ── -->
+  <div class="route-section">
+    <div class="section-header">
+      <div>
+        <div class="section-badge sb-b1">Line 01 · 왕복 노선</div>
+        <h2 class="section-title">해운대 · 센텀 · 광안리</h2>
+        <p class="section-subtitle">해운대해수욕장 출발 → 민락동 카페거리(종점) → 역방향 복귀</p>
+      </div>
+      <div class="section-meta">
+        <span class="big-stat bs-b1">~22km</span>
+        <span class="big-lbl">편도 총 거리</span>
+      </div>
+    </div>
+    <div class="flow-bar">
+      <div class="flow-label" style="color:var(--b1)">해운대해수욕장</div>
+      <div class="flow-fwd" style="background:var(--b1)">▶&nbsp;&nbsp;편도 약 22km 서진</div>
+      <div class="flow-rev" style="background:var(--b1); color:#fff">◀&nbsp;&nbsp;복귀 (역방향 동일 경로)</div>
+      <div class="flow-end" style="color:var(--b1)">민락동 카페거리</div>
+    </div>
+    <div class="content-grid">
+      <div class="map-wrap">
+        <div class="map-container" id="bmap1"></div>
+        <a class="map-link" href="https://www.google.com/maps/dir/?api=1&origin=35.1587,129.1604&destination=35.1490,129.1225&waypoints=35.1629,129.1580|35.1717,129.1335|35.1689,129.1296|35.1698,129.1311|35.1555,129.1200|35.1532,129.1187|35.1476,129.1302&travelmode=driving" target="_blank">↗ Google Maps에서 전체 경로 보기</a>
+      </div>
+      <div class="waypoint-panel">
+        <div class="panel-label">경유지 순서 (편도 기준)</div>
+        <div class="waypoint-item"><div class="wp-num">①</div><div class="wp-body"><div class="wp-name">해운대해수욕장 <span class="wp-tag start">출발</span></div><div class="wp-detail">해운대해변로 4~6차선 | 연중 최고밀도 관광 유동인구</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">②</div><div class="wp-body"><div class="wp-name">해운대역 사거리</div><div class="wp-detail">해운대로 6차선 | 마트·병원·판매시설 밀집. 신호대기 노출 최적</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">③</div><div class="wp-body"><div class="wp-name">APEC나루공원 앞</div><div class="wp-detail">APEC로 6차선 | 마린시티·요트경기장 인근. 고소득 거주인구</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">④</div><div class="wp-body"><div class="wp-name">신세계 센텀시티</div><div class="wp-detail">센텀남대로 6차선 | 세계 최대 백화점 정면. 주말 수만명 방문객</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑤</div><div class="wp-body"><div class="wp-name">롯데백화점 센텀·BEXCO</div><div class="wp-detail">센텀중앙로 6차선 | 쇼핑몰+전시장 복합 유동. 전시 개최 시 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑥</div><div class="wp-body"><div class="wp-name">수영강변로 남하</div><div class="wp-detail">수영강변로 4차선 | 센텀→광안리 연결. 자전거도로 병행</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑦</div><div class="wp-body"><div class="wp-name">광안리해수욕장 <span class="wp-tag key">핵심</span></div><div class="wp-detail">광안해변로 4차선 | 해변 전면 도로. 카페·음식점 연속 배치, 서행 노출 탁월</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑧</div><div class="wp-body"><div class="wp-name">광안대교·민락수변공원</div><div class="wp-detail">광안로·민락수변로 4차선 | 야간 LED쇼 명소. 2030 유동인구 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑨</div><div class="wp-body"><div class="wp-name">민락동 카페거리 <span class="wp-tag end">종점</span></div><div class="wp-detail">민락로 4차선 | 편도 최종 도착. 2030 타깃 카페·펍 밀집. 이후 역방향 출발</div></div></div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-card">
+        <div class="info-card-label">주요 도로</div>
+        <div class="info-card-value">해운대해변로 · APEC로 · 센텀남대로 · 센텀중앙로 · 수영강변로 · 광안해변로 · 광안로 · 민락수변로</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">운행 주의사항</div>
+        <div class="info-card-value">성수기 해운대해변로 혼잡 · 민락수변공원 주정차 제한</div>
+        <div class="info-card-note">서행 구간 광고 노출 효과 최대 / 전 구간 4차선 이상</div>
+      </div>
+    </div>
+    <div class="notice-block">
+      <strong>왕복 전략 포인트</strong> — 동일 유동인구 구간을 편도·복귀 양방향으로 재통과하여 동일 인물에게 2회 이상 광고가 노출됩니다. 특히 <strong>센텀시티·광안리 구간</strong>은 쇼핑 입장 전 + 귀가 시 재노출로 브랜드 인지도 누적 효과가 극대화됩니다.
+    </div>
+  </div>
+
+  <!-- ── 부산 2호선 ── -->
+  <div class="route-section">
+    <div class="section-header">
+      <div>
+        <div class="section-badge sb-b2">Line 02 · 왕복 노선</div>
+        <h2 class="section-title">서면 · 초량 · 남포 · 송도</h2>
+        <p class="section-subtitle">서면 롯데백화점 출발 → 암남공원·케이블카(종점) → 역방향 복귀</p>
+      </div>
+      <div class="section-meta">
+        <span class="big-stat bs-b2">~27km</span>
+        <span class="big-lbl">편도 총 거리</span>
+      </div>
+    </div>
+    <div class="flow-bar">
+      <div class="flow-label" style="color:var(--b2)">서면 롯데백화점</div>
+      <div class="flow-fwd" style="background:var(--b2)">▶&nbsp;&nbsp;편도 약 27km 남서진</div>
+      <div class="flow-rev" style="background:var(--b2); color:#fff">◀&nbsp;&nbsp;복귀 (역방향 동일 경로)</div>
+      <div class="flow-end" style="color:var(--b2)">암남공원·케이블카</div>
+    </div>
+    <div class="content-grid">
+      <div class="map-wrap">
+        <div class="map-container" id="bmap2"></div>
+        <a class="map-link" href="https://www.google.com/maps/dir/?api=1&origin=35.1571,129.0563&destination=35.0719,129.0115&waypoints=35.1530,129.0530|35.1339,129.0487|35.1148,129.0393|35.0982,129.0292|35.0966,129.0308|35.0993,129.0314|35.0842,129.0218|35.0775,129.0168&travelmode=driving" target="_blank">↗ Google Maps에서 전체 경로 보기</a>
+      </div>
+      <div class="waypoint-panel">
+        <div class="panel-label">경유지 순서 (편도 기준)</div>
+        <div class="waypoint-item"><div class="wp-num">①</div><div class="wp-body"><div class="wp-name">서면 롯데백화점 <span class="wp-tag start">출발</span></div><div class="wp-detail">가야대로 8차선 | 부산 최대 유동 거점</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">②</div><div class="wp-body"><div class="wp-name">서면로터리·청춘의거리</div><div class="wp-detail">서면로터리 교차 | 2030 유동인구 최밀집. 신호대기 노출 거점</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">③</div><div class="wp-body"><div class="wp-name">부산진역 인근</div><div class="wp-detail">중앙대로 6차선 | 재래시장·도매상가 직장인 밀집 구간</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">④</div><div class="wp-body"><div class="wp-name">부산역 광장 <span class="wp-tag key">핵심</span></div><div class="wp-detail">중앙대로 6차선 | KTX+관광객 일 10만명↑. 광고 밀도 최상</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑤</div><div class="wp-body"><div class="wp-name">텍사스스트리트·차이나타운</div><div class="wp-detail">4차선 | 외국인·관광객 국제 유동인구 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑥</div><div class="wp-body"><div class="wp-name">BIFF광장</div><div class="wp-detail">남포로 4차선 | 부산 최대 먹거리·관광 밀집지</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑦</div><div class="wp-body"><div class="wp-name">자갈치시장·자갈치해안로</div><div class="wp-detail">자갈치해안로 4차선 | 해안도로 노출 탁월</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑧</div><div class="wp-body"><div class="wp-name">광복로 패션거리</div><div class="wp-detail">광복로 4차선 | 부산 최대 패션·브랜드거리</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑨</div><div class="wp-body"><div class="wp-name">송도해수욕장 <span class="wp-tag key">핵심</span></div><div class="wp-detail">송도해변로 4차선 | 한국 최초 공설해수욕장. 스카이워크·케이블카 인근</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑩</div><div class="wp-body"><div class="wp-name">암남공원·해상케이블카 <span class="wp-tag end">종점</span></div><div class="wp-detail">암남로 4차선 | 송도 서측 끝단 회차. 케이블카 탑승객 유동</div></div></div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-card">
+        <div class="info-card-label">주요 도로</div>
+        <div class="info-card-value">가야대로(8차선) · 중앙대로(6차선) · 남포로 · 자갈치해안로 · 광복로 · 송도해안로 · 암남로</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">운행 주의사항</div>
+        <div class="info-card-value">광복로 주말 오후 보행전용 시간대 일부 존재</div>
+        <div class="info-card-note">→ 자갈치해안로 우회 가능 / 송도 성수기 혼잡 시 서행 광고 효과 증가</div>
+      </div>
+    </div>
+    <div class="notice-block">
+      <strong>송도 연장 효과</strong> — 기존 남포 구간에서 서진 연장하여 <strong>서구 송도해수욕장</strong>까지 커버. 관광객+가족 단위 유동인구와 스카이워크·해상케이블카 방문객까지 추가 노출. 성수기 주말 주차 혼잡 구간은 버스 서행 시 광고 노출 시간이 증가합니다.
+    </div>
+  </div>
+
+  <!-- ── 부산 2호선-A ── -->
+  <div class="route-section">
+    <div class="section-header">
+      <div>
+        <div class="section-badge sb-b2a">Line 02-A · 이벤트 특화 · 6월 12~13일</div>
+        <h2 class="section-title">서면 · 아시아드 · 초량 · 남포</h2>
+        <p class="section-subtitle">서면 출발 → 아시아드주경기장 경유·회차 → 서면 재진입 → 남포(종점) → 역방향 복귀</p>
+      </div>
+      <div class="section-meta">
+        <span class="big-stat bs-b2a">~35km</span>
+        <span class="big-lbl">편도 총 거리</span>
+      </div>
+    </div>
+    <div class="flow-bar">
+      <div class="flow-label" style="color:var(--b2a)">서면 롯데백화점</div>
+      <div class="flow-fwd" style="background:var(--b2a)">▶&nbsp;&nbsp;아시아드 경유 → 남포 ~35km</div>
+      <div class="flow-rev" style="background:var(--b2a); color:#fff">◀&nbsp;&nbsp;남포 → 서면 → 아시아드 재경유 복귀</div>
+      <div class="flow-end" style="color:var(--b2a)">서면 복귀</div>
+    </div>
+    <div class="content-grid">
+      <div class="map-wrap">
+        <div class="map-container" id="bmap3"></div>
+        <a class="map-link" href="https://www.google.com/maps/dir/?api=1&origin=35.1571,129.0563&destination=35.0993,129.0314&waypoints=35.1650,129.0572|35.1760,129.0570|35.1901,129.0583|35.1760,129.0570|35.1571,129.0563|35.1339,129.0487|35.1148,129.0393|35.0982,129.0292|35.0966,129.0308&travelmode=driving" target="_blank">↗ Google Maps에서 전체 경로 보기</a>
+      </div>
+      <div class="waypoint-panel">
+        <div class="panel-label">경유지 순서 (편도 기준)</div>
+        <div class="waypoint-item"><div class="wp-num">①</div><div class="wp-body"><div class="wp-name">서면 롯데백화점 <span class="wp-tag start">출발</span></div><div class="wp-detail">가야대로 8차선 | 출발 기점</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">②</div><div class="wp-body"><div class="wp-name">서면로터리 → 가야대로 북상</div><div class="wp-detail">가야대로 8차선 | 서면에서 월드컵대로 방향 북상. 출퇴근 유동 밀집 간선도로</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">③</div><div class="wp-body"><div class="wp-name">월드컵대로 진입 (실레교차로)</div><div class="wp-detail">월드컵대로 4~6차선 | 연제구 실레동 상권</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">④</div><div class="wp-body"><div class="wp-name">부산아시아드주경기장 <span class="wp-tag key">필수</span></div><div class="wp-detail">월드컵대로 344 (연제구) | 6/12~13 이벤트 집결지. 왕복 편·복귀 양방향 경유</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑤</div><div class="wp-body"><div class="wp-name">월드컵대로 → 서면 재진입</div><div class="wp-detail">월드컵대로 남하 | 아시아드 회차 후 서면 복귀</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑥</div><div class="wp-body"><div class="wp-name">서면 → 중앙대로 남하</div><div class="wp-detail">중앙대로 6차선 | 서면 재진입 후 남포 방향 남하</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑦</div><div class="wp-body"><div class="wp-name">부산역 광장 <span class="wp-tag key">핵심</span></div><div class="wp-detail">중앙대로 6차선 | KTX+관광객 일 10만명↑</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑧</div><div class="wp-body"><div class="wp-name">BIFF광장 · 자갈치시장</div><div class="wp-detail">남포로·자갈치해안로 4차선 | 남포 핵심 상권</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑨</div><div class="wp-body"><div class="wp-name">텍사스스트리트·차이나타운</div><div class="wp-detail">4차선 | 국제 유동인구 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑩</div><div class="wp-body"><div class="wp-name">광복로 패션거리 <span class="wp-tag end">종점</span></div><div class="wp-detail">광복로 4차선 | 편도 최종 도착. 복귀 시 서면→아시아드 재경유</div></div></div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-card">
+        <div class="info-card-label">아시아드 접근 경로</div>
+        <div class="info-card-value">서면 → 가야대로(8차선) → 실레교차로 → 월드컵대로 → 아시아드주경기장(연제구 월드컵대로 344)</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">2호선 대비 차이점</div>
+        <div class="info-card-value">아시아드 루프 추가 · 송도 구간 미포함</div>
+        <div class="info-card-note">이벤트 특화 구성으로 서면↔아시아드 구간 광고 노출 집중. 연제구 월드컵대로 상권 추가 커버</div>
+      </div>
+    </div>
+    <div class="notice-block">
+      <strong>왕복 아시아드 2회 경유 전략</strong> — 편도(서면→아시아드→서면→남포)와 복귀(남포→서면→아시아드→서면) 모두 아시아드주경기장을 경유합니다. 이벤트 <strong>6월 12~13일</strong> 공연·경기 관람객 유입 전(오전~오후)과 귀가 시(저녁)에 각각 수만 명 규모의 집중 노출이 가능합니다.
+    </div>
+  </div>
+
+</div><!-- /city-busan -->
+
+
+<!-- ════════════════════════════════════════ -->
+<!-- 서울 SECTION -->
+<!-- ════════════════════════════════════════ -->
+<div class="city-section" id="city-seoul">
+
+  <div class="city-header">
+    <span class="city-tag">Seoul</span>
+    <span class="city-name">서울특별시</span>
+    <span class="city-sub">2개 노선 · KT 빅데이터 체류인구 히트맵 기반 루프 순환 설계</span>
+  </div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar cols-2">
+    <div class="summary-cell sc-s1">
+      <div class="line-tag lt-s1">Line 01</div>
+      <h3>목동 · 영등포 · 여의도</h3>
+      <p class="route-desc">오목교 → 목동 → 당산역 → 영등포역 → 여의도 → 복귀<br>서남권 루프 순환 노선</p>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val sv-s1">~38km</span><span class="stat-lbl">루프 거리</span></div>
+        <div class="stat"><span class="stat-val sv-s1">950명+</span><span class="stat-lbl">최고밀도 (영등포역)</span></div>
+      </div>
+    </div>
+    <div class="summary-cell sc-s2">
+      <div class="line-tag lt-s2">Line 02</div>
+      <h3>잠실 · 삼성 · 역삼 · 개포</h3>
+      <p class="route-desc">잠실역 → 종합운동장 → 삼성역 → 역삼역 → 도곡 → 개포 → 대치동 → 선릉역 → 복귀<br>강남권 루프 순환 노선</p>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val sv-s2">~31km</span><span class="stat-lbl">루프 거리</span></div>
+        <div class="stat"><span class="stat-val sv-s2">1,400명+</span><span class="stat-lbl">최고밀도 (잠실역)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 서울 1호선 ── -->
+  <div class="route-section">
+    <div class="section-header">
+      <div>
+        <div class="section-badge sb-s1">Line 01 · 루프 순환 노선</div>
+        <h2 class="section-title">목동 · 영등포 · 여의도</h2>
+        <p class="section-subtitle">오목교 출발 → 목동 → 당산역 → 영등포역 → 신도림 → 여의도 국회대로 순환 → 복귀</p>
+      </div>
+      <div class="section-meta">
+        <span class="big-stat bs-s1">~38km</span>
+        <span class="big-lbl">루프 총 거리</span>
+      </div>
+    </div>
+    <div class="flow-bar">
+      <div class="flow-label" style="color:var(--s1)">오목교역</div>
+      <div class="flow-fwd" style="background:var(--s1)">▶&nbsp;&nbsp;목동 → 당산역 → 영등포역 → 신도림 → 여의도</div>
+      <div class="flow-rev" style="background:var(--s1); color:#fff">◀&nbsp;&nbsp;여의도 → 오목교 복귀 (신목동로)</div>
+      <div class="flow-end" style="color:var(--s1)">순환</div>
+    </div>
+    <div class="content-grid">
+      <div class="map-wrap">
+        <div class="map-container" id="smap1"></div>
+        <a class="map-link" href="https://www.google.com/maps/dir/?api=1&origin=37.5265,126.8749&destination=37.5260,126.9244&waypoints=37.5338,126.8661|37.5265,126.8698|37.5342,126.9006|37.5158,126.9069|37.5088,126.8908|37.5282,126.9145&travelmode=driving" target="_blank">↗ Google Maps에서 전체 경로 보기</a>
+      </div>
+      <div class="waypoint-panel">
+        <div class="panel-label">경유지 순서 (루프 기준)</div>
+        <div class="waypoint-item"><div class="wp-num">①</div><div class="wp-body"><div class="wp-name">오목교역 <span class="wp-tag start">출발</span></div><div class="wp-detail">오목교로 4차선 | 목동 아파트 단지 진입점. 370~569명 중밀도</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">②</div><div class="wp-body"><div class="wp-name">목동 아파트 단지</div><div class="wp-detail">오목교로 4차선 | 목동 대단지 밀집 구간. 370~569명 연속 중밀도</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">③</div><div class="wp-body"><div class="wp-name">목동역</div><div class="wp-detail">목동로 6차선 | 목동→당산 연결 간선. 240~369명</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">④</div><div class="wp-body"><div class="wp-name">당산역</div><div class="wp-detail">양화로·당산로 6차선 | 2·9호선 환승역. 유동인구 집중 신호 대기 구간</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑤</div><div class="wp-body"><div class="wp-name">영등포역 · 타임스퀘어 <span class="wp-tag key">★ 최고밀도</span></div><div class="wp-detail">영등포로 4차선 | 950명 이상 최고밀도 블록. 히트맵 기준 진한 빨강 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑥</div><div class="wp-body"><div class="wp-name">신도림역 · 도림로</div><div class="wp-detail">경인로·도림로 6차선 | 570~949명 오렌지 블록 연속. 노출 연장 효과</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑦</div><div class="wp-body"><div class="wp-name">여의도 국회대로 순환 <span class="wp-tag key">핵심</span></div><div class="wp-detail">여의대방로·국회대로 8차선 | 대형 버스 운행 최적. 직장인 이동 동선 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑧</div><div class="wp-body"><div class="wp-name">여의도 공원 → 오목교 복귀 <span class="wp-tag end">복귀</span></div><div class="wp-detail">신목동로·오목교로 4차선 | 여의도→오목교 복귀. 140~239명</div></div></div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-card">
+        <div class="info-card-label">주요 도로</div>
+        <div class="info-card-value">오목교로 · 목동로 · 양화로 · 당산로 · 영등포로 · 경인로 · 도림로 · 여의대방로 · 국회대로 · 신목동로</div>
+        <div class="info-card-note">전 구간 왕복 4차선 이상 | 최대 국회대로 8차선</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">운행 주의사항</div>
+        <div class="info-card-value">영등포역 주변 혼잡 시간대 서행<br>여의도 국회 일정 시 차량 통제 확인</div>
+        <div class="info-card-note">혼잡 구간 서행 = 광고 노출 시간 증가 / 5633·5622·661·600번 노선 참고</div>
+      </div>
+    </div>
+    <div class="notice-block">
+      <strong>영등포역 최우선 노출 구간</strong> — 타임스퀘어 인근 950명 이상 최고밀도 블록 통과. <strong>경인로·도림로 연속 구간</strong>에서 570~949명 오렌지 블록이 이어져 영등포역 직후에도 노출이 지속됩니다. 여의도 국회대로 8차선은 대형 버스 운행 최적 구간으로 직장인 출퇴근 동선을 집중 커버합니다.
+    </div>
+  </div>
+
+  <!-- ── 서울 2호선 ── -->
+  <div class="route-section">
+    <div class="section-header">
+      <div>
+        <div class="section-badge sb-s2">Line 02 · 루프 순환 노선</div>
+        <h2 class="section-title">잠실 · 삼성 · 역삼 · 개포</h2>
+        <p class="section-subtitle">잠실역 출발 → 종합운동장 → 삼성역 → 역삼역 → 도곡 → 개포·한티 → 대치동 → 선릉역 → 복귀</p>
+      </div>
+      <div class="section-meta">
+        <span class="big-stat bs-s2">~31km</span>
+        <span class="big-lbl">루프 총 거리</span>
+      </div>
+    </div>
+    <div class="flow-bar">
+      <div class="flow-label" style="color:var(--s2)">잠실역</div>
+      <div class="flow-fwd" style="background:var(--s2)">▶&nbsp;&nbsp;올림픽로 → 영동대로 → 테헤란로 → 역삼로 → 개포로 → 선릉로</div>
+      <div class="flow-rev" style="background:var(--s2); color:#fff">◀&nbsp;&nbsp;테헤란로·영동대로 복귀</div>
+      <div class="flow-end" style="color:var(--s2)">순환</div>
+    </div>
+    <div class="content-grid">
+      <div class="map-wrap">
+        <div class="map-container" id="smap2"></div>
+        <a class="map-link" href="https://www.google.com/maps/dir/?api=1&origin=37.5132,127.1001&destination=37.5046,127.0493&waypoints=37.5115,127.0756|37.5088,127.0628|37.5008,127.0360|37.4876,127.0424|37.4803,127.0492|37.4938,127.0609&travelmode=driving" target="_blank">↗ Google Maps에서 전체 경로 보기</a>
+      </div>
+      <div class="waypoint-panel">
+        <div class="panel-label">경유지 순서 (루프 기준)</div>
+        <div class="waypoint-item"><div class="wp-num">①</div><div class="wp-body"><div class="wp-name">잠실역 · 롯데월드몰 <span class="wp-tag start">출발</span></div><div class="wp-detail">올림픽로 8차선 | 1,400명 이상 최고밀도. 히트맵 진한 빨강 블록 다수 집중</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">②</div><div class="wp-body"><div class="wp-name">종합운동장 <span class="wp-tag key">핵심</span></div><div class="wp-detail">올림픽로 8차선 | 740~1,400명 오렌지 블록. 스포츠·공연 이벤트 시 유동 급증</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">③</div><div class="wp-body"><div class="wp-name">삼성역 · 코엑스</div><div class="wp-detail">영동대로 8차선 | 740~1,400명. 업무지구+컨벤션 유동인구 복합</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">④</div><div class="wp-body"><div class="wp-name">역삼역 <span class="wp-tag key">전환점</span></div><div class="wp-detail">테헤란로 8차선 | 430~739명. 강남역 진입 전 이탈 → 역삼로 남하. 광고 포화 구간 우회</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑤</div><div class="wp-body"><div class="wp-name">도곡역</div><div class="wp-detail">역삼로·도곡로 4~6차선 | 430~739명 중밀도 유지</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑥</div><div class="wp-body"><div class="wp-name">개포 · 한티</div><div class="wp-detail">개포로 4~6차선 | 270~429명. 재건축 이주 수요 유동인구</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑦</div><div class="wp-body"><div class="wp-name">대치동 (은마아파트)</div><div class="wp-detail">양재천로 4차선 | 430~739명. 재건축 수요+학원가 복합 유동인구</div></div></div>
+        <div class="waypoint-item"><div class="wp-num">⑧</div><div class="wp-body"><div class="wp-name">선릉역 → 잠실역 복귀 <span class="wp-tag end">복귀</span></div><div class="wp-detail">선릉로·테헤란로·영동대로 6~8차선 | 270~429명. 루프 종료 후 잠실 복귀</div></div></div>
+      </div>
+    </div>
+    <div class="info-row">
+      <div class="info-card">
+        <div class="info-card-label">주요 도로</div>
+        <div class="info-card-value">올림픽로 · 영동대로 · 테헤란로 · 역삼로 · 도곡로 · 개포로 · 양재천로 · 선릉로</div>
+        <div class="info-card-note">전 구간 왕복 4차선 이상 | 최대 올림픽로·영동대로·테헤란로 8차선</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">노선 변경 핵심 (강남역 우회)</div>
+        <div class="info-card-value">역삼역에서 이탈 → 역삼로 남하<br>강남대로 → 역삼로·도곡로 대체</div>
+        <div class="info-card-note">강남역 광고 포화 구간 완전 우회. 구 노선 대비 5km 단축 → 일 운행 횟수 증가 가능</div>
+      </div>
+    </div>
+    <div class="notice-block">
+      <strong>잠실역 1,400명+ 최우선 노출</strong> — 롯데월드몰 상권 기준 서울 최고밀도 블록. <strong>삼성역(코엑스) 구간</strong>까지 740~1,400명 오렌지 블록이 연속 유지됩니다. 역삼역 이후 역삼로·도곡로로 남하하여 <strong>강남역 광고 포화 환경을 완전 우회</strong>하며, 대치동·개포 등 재건축 수요 밀집 구역으로 노출을 확장합니다.
+    </div>
+  </div>
+
+</div><!-- /city-seoul -->
+
+
+<!-- ── FOOTER ── -->
+<div class="footer">
+  <div class="footer-brand">AdType · Draftype Studio</div>
+  <div class="footer-info">
+    버스 외부 광고 노선 기획안<br>
+    부산 3개 노선 · 서울 2개 노선
+  </div>
+</div>
+
+
+<script>
+// ── 도시 탭 전환 ──
+function switchCity(city) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.city-section').forEach(s => s.classList.remove('active'));
+  document.querySelector(`[data-city="${city}"]`).classList.add('active');
+  document.getElementById(`city-${city}`).classList.add('active');
+  // 지도 invalidateSize (탭 전환 시 리렌더링)
+  setTimeout(() => {
+    Object.values(maps).forEach(m => m && m.invalidateSize());
+  }, 50);
+}
+
+// ── Leaflet 지도 설정 ──
+const tileUrl  = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const tileOpts = { attribution: '&copy; <a href="https://carto.com">CARTO</a>', maxZoom: 18 };
+
+// 노선 컬러
+const CB1  = '#EB4200';
+const CB2  = '#1D63D8';
+const CB2A = '#B87000';
+const CS1  = '#0A7A4B';
+const CS2  = '#6B35C4';
+
+const maps = {};
+
+function makeIcon(color, label) {
+  return L.divIcon({
+    html: `<div style="
+      width:26px;height:26px;background:${color};
+      border-radius:50%;border:2px solid #fff;
+      box-shadow:0 1px 5px rgba(0,0,0,0.25);
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Pretendard',sans-serif;font-size:10px;font-weight:700;
+      color:#fff;line-height:1;
+    ">${label}</div>`,
+    className: '', iconSize: [26,26], iconAnchor: [13,13]
+  });
+}
+
+function initMap(id, center, zoom, pts, color, loop) {
+  const m = L.map(id, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
+  L.tileLayer(tileUrl, tileOpts).addTo(m);
+  const coords = pts.map(p => p.latlng);
+  const line = loop ? [...coords, coords[0]] : coords;
+  L.polyline(line, { color, weight: 3.5, opacity: 0.95 }).addTo(m);
+  if (!loop) {
+    L.polyline([...coords].reverse(), { color, weight: 2, opacity: 0.3, dashArray: '6 5' }).addTo(m);
+  }
+  pts.forEach(p => L.marker(p.latlng, { icon: makeIcon(color, p.label) }).addTo(m).bindPopup(`<b>${p.name}</b>`));
+  maps[id] = m;
+}
+
+// ─── 부산 1호선 ───
+initMap('bmap1', [35.158, 129.133], 13, [
+  { latlng:[35.1587,129.1604], label:'①', name:'해운대해수욕장' },
+  { latlng:[35.1629,129.1580], label:'②', name:'해운대역 사거리' },
+  { latlng:[35.1717,129.1335], label:'③', name:'APEC나루공원' },
+  { latlng:[35.1689,129.1296], label:'④', name:'신세계 센텀시티' },
+  { latlng:[35.1698,129.1311], label:'⑤', name:'롯데센텀·BEXCO' },
+  { latlng:[35.1555,129.1200], label:'⑥', name:'수영강변로' },
+  { latlng:[35.1532,129.1187], label:'⑦', name:'광안리해수욕장' },
+  { latlng:[35.1476,129.1302], label:'⑧', name:'광안대교·민락수변공원' },
+  { latlng:[35.1490,129.1225], label:'⑨', name:'민락동 카페거리' },
+], CB1, false);
+
+// ─── 부산 2호선 ───
+initMap('bmap2', [35.110, 129.035], 12, [
+  { latlng:[35.1571,129.0563], label:'①', name:'서면 롯데백화점' },
+  { latlng:[35.1530,129.0530], label:'②', name:'서면로터리' },
+  { latlng:[35.1339,129.0487], label:'③', name:'부산진역' },
+  { latlng:[35.1148,129.0393], label:'④', name:'부산역 광장' },
+  { latlng:[35.0982,129.0292], label:'⑤', name:'텍사스스트리트' },
+  { latlng:[35.0966,129.0308], label:'⑥', name:'BIFF광장' },
+  { latlng:[35.0993,129.0314], label:'⑦', name:'자갈치시장·광복로' },
+  { latlng:[35.0842,129.0218], label:'⑧', name:'송도해안로' },
+  { latlng:[35.0775,129.0168], label:'⑨', name:'송도해수욕장' },
+  { latlng:[35.0719,129.0115], label:'⑩', name:'암남공원·케이블카' },
+], CB2, false);
+
+// ─── 부산 2호선-A ───
+initMap('bmap3', [35.145, 129.050], 12, [
+  { latlng:[35.1571,129.0563], label:'①', name:'서면 롯데백화점' },
+  { latlng:[35.1650,129.0572], label:'②', name:'가야대로 북상' },
+  { latlng:[35.1760,129.0570], label:'③', name:'월드컵대로 진입' },
+  { latlng:[35.1901,129.0583], label:'④', name:'부산아시아드주경기장' },
+  { latlng:[35.1760,129.0570], label:'⑤', name:'서면 복귀 구간' },
+  { latlng:[35.1571,129.0563], label:'⑥', name:'서면 재진입' },
+  { latlng:[35.1339,129.0487], label:'⑦', name:'부산진역' },
+  { latlng:[35.1148,129.0393], label:'⑧', name:'부산역 광장' },
+  { latlng:[35.0982,129.0292], label:'⑨', name:'BIFF광장' },
+  { latlng:[35.0966,129.0308], label:'⑩', name:'자갈치시장' },
+  { latlng:[35.0993,129.0314], label:'⑪', name:'광복로(종점)' },
+], CB2A, false);
+
+// ─── 서울 1호선 ───
+initMap('smap1', [37.524, 126.908], 13, [
+  { latlng:[37.5265,126.8749], label:'①', name:'오목교역' },
+  { latlng:[37.5338,126.8661], label:'②', name:'목동 아파트 단지' },
+  { latlng:[37.5265,126.8698], label:'③', name:'목동역' },
+  { latlng:[37.5342,126.9006], label:'④', name:'당산역' },
+  { latlng:[37.5158,126.9069], label:'⑤', name:'영등포역·타임스퀘어' },
+  { latlng:[37.5088,126.8908], label:'⑥', name:'신도림역·도림로' },
+  { latlng:[37.5282,126.9145], label:'⑦', name:'여의도 국회대로 순환' },
+  { latlng:[37.5260,126.9244], label:'⑧', name:'여의도→오목교 복귀' },
+], CS1, true);
+
+// ─── 서울 2호선 ───
+initMap('smap2', [37.502, 127.055], 13, [
+  { latlng:[37.5132,127.1001], label:'①', name:'잠실역·롯데월드몰' },
+  { latlng:[37.5115,127.0756], label:'②', name:'종합운동장' },
+  { latlng:[37.5088,127.0628], label:'③', name:'삼성역·코엑스' },
+  { latlng:[37.5008,127.0360], label:'④', name:'역삼역' },
+  { latlng:[37.4876,127.0424], label:'⑤', name:'도곡역' },
+  { latlng:[37.4803,127.0492], label:'⑥', name:'개포·한티' },
+  { latlng:[37.4938,127.0609], label:'⑦', name:'대치동 (은마아파트)' },
+  { latlng:[37.5046,127.0493], label:'⑧', name:'선릉역→잠실역 복귀' },
+], CS2, true);
+</script>
+</body>
+</html>
